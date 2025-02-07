@@ -1,7 +1,9 @@
-source("../../global.R")
+source("global.R")
 library(ggnewscale)
 open_dataset("data/fbs") ->fbs
 open_dataset("data/sua") ->sua
+open_dataset("data/consumerprices") ->cprices
+
 library(shinyTree)
 suaitems <- readRDS("data/suaitems.rds")
 sua.item.list <- readRDS("data/suaitemlist.rds")
@@ -86,7 +88,8 @@ fbsplot <- function(data1=fbs1, data2=fbs2, item, percap, flag) {
     return(p)
 }
 
-calplot <- function(data1=fbs1, data2=fbs2, data3=food, unit, percap, fillscale) {
+calplot <- function(data1=fbs1, data2=fbs2, data3=food,
+                    unit, percap, fillscale) {
     datalabels<-rbind(data1[,.(Label="S", yposition=-round(max(data1$Value)/50)),Year],
                       data2[,.(Label="U", yposition=-round(max(data1$Value)/50)),Year],
                       data3[,.(Label="F", yposition=-round(max(data1$Value)/50)),Year])
@@ -119,8 +122,23 @@ calplot <- function(data1=fbs1, data2=fbs2, data3=food, unit, percap, fillscale)
                           guide = guide_legend(position="bottom")) +
         ## scale_fill_discrete(name = "Food") +
         geom_text(data=datalabels, aes(x=Year, y=yposition, label=Label), size=3) +
+        scale_x_continuous("Year", breaks = c(2012, 2016, 2020)) +
         scale_y_continuous(unit)
     return(p)
+}
+
+
+priceplot <- function(pricedata){
+  p <- ggplot(pricedata, aes(x=Year, y=Value, group = Area)) +
+      geom_point() +
+      geom_line() +
+      scale_x_continuous("Year",
+                         limits = c(min(pricedata$Year) - 0.22,
+                                    max(pricedata$Year) + 0.22),
+                         breaks = c(2012, 2016, 2020)) +
+      ggtitle(paste0("Consumer price index for food in ",pricedata$Area[1])) +
+      theme(plot.margin = margin(t = 5.5, r = 140, b = 5.5, l = 5.5, unit = "pt"))
+  return(p)
 }
 
 ## ,"#999999"
@@ -182,7 +200,7 @@ ui <- fluidPage(
                                                value=5
                                                ),
                                   actionButton("showcalplot", label="Plot"),
-                                  width=3),
+                                  width=2),
                      mainPanel(
                          id="maintab0",
                          uiOutput("giraphcalplot"),
@@ -492,14 +510,21 @@ server <- function(input, output, session) {
                              "#984EA3", "#FF7F00", "#FFFF33", "#A65628",
                              "#999999", "#440154"))
         }
+        cpricesDT <- cprices |>
+            ## filter(Element_Code!=5301)  |>
+            filter(as.character(Item_Code) %in% 23013) |>
+            filter(Year>=input$selecttrendyearsin[1] & Year<=input$selecttrendyearsin[2]) |>
+            filter(Area %in% input$selectcalcountriesin) |>
+            as.data.table()
+        cpricesDT <- cpricesDT[,.(Value=mean(Value)),
+                               .(Area, Year)]
         p <-list()
-                                        #        for (i in 1:length(selected)) {
-        p1 <- calplot(data1=fbs1, data2=fbs2, data3 = food,
+        ## for (i in 1:length(selected)) {
+        p[[1]] <- calplot(data1=fbs1, data2=fbs2, data3 = food,
                       percap=FALSE, unit=plotunit,
                       fillscale=utscale)
-        p[[1]] <- p1
-                                        #       }
-
+        p[[2]] <- priceplot(pricedata=cpricesDT)
+        ##       }
         get_plot_output_list <- function() {
             plot_output_list <- lapply(1:length(p), function(i) {
                 plotname <- paste("plot", i, sep="")
@@ -519,6 +544,7 @@ server <- function(input, output, session) {
             do.call(tagList, plot_output_list)
             return(plot_output_list)
         }
+
 
         output$giraphcalplot <- renderUI({ get_plot_output_list() })
 
