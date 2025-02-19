@@ -1,0 +1,56 @@
+/* Put shiny notifications front and center */
+#shiny-notification-panel {
+  top: 0;
+  bottom: unset;
+  /* left: 0; */
+  /* right: 0; */
+  margin-left: auto;
+  margin-right: auto;
+  width: 100%;
+  max-width: 450px;
+}
+
+
+body{
+    max-width=100%
+}
+
+h1, h2, h3, h4, h5, h6 {font-family:serif;}
+
+h2 {font-size: 2.5rem;text-align: center;}
+h3 {font-size: 1.5rem;}
+h4 {font-size: 1.2rem;text-align: center;}
+h5 {font-size: 1rem;}
+.inlinehead {float: left; width: 60%;}
+.righthelp{float: right;  width: 30%;}
+
+.form-label, .shiny-input-container .control-label {
+        margin-bottom: .1rem;
+}
+
+.form-group {
+        margin-bottom: 0rem;y
+}
+
+.shiny-notification {
+             position:fixed;
+             top: calc(50%);
+             left: calc(50%);
+             }
+
+
+.jstree-anchor {
+    /*enable wrapping*/
+    white-space : normal !important;
+    /*ensure lower nodes move down*/
+    height : auto !important;
+    /*offset icon width*/
+    padding-right : 24px;
+}
+
+#tree_div_id a {
+    white-space: normal;
+    height: auto;
+    padding: 0.5ex 1ex;
+    margint-top:1ex;
+}
