@@ -1,24 +1,26 @@
-#setwd("~/vikas/suasummary")
+                                        #setwd("~/vikas/suasummary")
 # renv::init()
-# install.packages("faosws", repos="https://rstudiopm.fao.org/fao-sws-cran/latest" )
-
+#install.packages("faosws", repos="https://rstudiopm.fao.org/fao-sws-cran/latest" )
 #install.packages("faoswsUtil", repos="https://rstudiopm.fao.org/fao-sws-cran/latest" )
+#install.packages("faoswsModules", repos="https://rstudiopm.fao.org/fao-sws-cran/latest" )
+if (!require("Require")) {install.packages("Require"); require("Require")}
 library(faosws)
 library(faoswsModules)
 library(faoswsUtil)
-library(data.table)
-library(dplyr)
-library(tidyr)
-library(shiny)
-library(shinyjs)
-library(ggplot2)
-library(ggiraph)
-library(ggnewscale)
-library(colorspace)
-#library(hablar)
-library(countrycode)
-library(shinyTree)
-library(paletteer)
+Require(data.table)
+Require(dplyr)
+Require(tidyr)
+Require(shiny)
+Require(shinyjs)
+Require(ggplot2)
+Require(ggiraph)
+Require(ggnewscale)
+Require(colorspace)
+#Require(hablar)
+Require(countrycode)
+Require(shinyTree)
+Require(paletteer)
+Require(rrapply)
 
 options(scipen=999999)
 colorred="#ca0020"
@@ -31,11 +33,11 @@ R_SWS_SHARE_PATH = Sys.getenv("R_SWS_SHARE_PATH")
 
 if(CheckDebug()){
   message("Not on server, so setting up environment...")
-  
+
   library(faoswsModules)
   SETT <- ReadSettings("sws.yml")
-  
-  #R_SWS_SHARE_PATH <- SETT[["share"]]  
+
+  #R_SWS_SHARE_PATH <- SETT[["share"]]
   ## Get SWS Parameters
 ##  SetClientFiles()
   GetTestEnvironment(
@@ -51,11 +53,11 @@ yearrange = GetCodeList(domain = "suafbs", dataset = "sua_balanced", "timePointY
 yearrange <- yearrange[as.numeric(code)>2010 & as.numeric(code) < as.numeric(format(Sys.Date(), "%Y"))-1]
 yearrange[ , code := as.numeric(code)]
 
-sua.elements <- GetCodeList(domain="suafbs", dataset = "sua_balanced", 
+sua.elements <- GetCodeList(domain="suafbs", dataset = "sua_balanced",
                             "measuredElementSuaFbs")
-sua.elements <- sua.elements[code %in% c("5016", "5023", "5071", "5141", 
+sua.elements <- sua.elements[code %in% c("5016", "5023", "5071", "5141",
                                          "5113", "5141", "5164", "5165",
-                                         "5166", "5510", "5520", "5610", 
+                                         "5166", "5510", "5520", "5610",
                                          "5910", "5525")]
 
 sua.elements$description <- gsub(" [t]","", sua.elements$description)
@@ -114,13 +116,12 @@ suaitems <- rrapply::rrapply(suaitems[,.(id1,id2,id3,id4,item_sua_fbs,item_sua_f
 
 ## Pull Global NCT data
 
-areaCodes = GetCodeList("suafbs", "global_nct", "geographicAreaM49")$code
-itemCodes = GetCodeList("suafbs", "global_nct", "measuredItemCPC")$code
-elementCodes = GetCodeList("suafbs", "global_nct", "measuredElement")$code
-timeCodes = GetCodeList("suafbs", "global_nct", "timePointYearsSP")$code
-
-itemNames <- GetCodeList("suafbs", "global_nct", "measuredItemCPC")[,.(code,Item=description)]
-
+## areaCodes = GetCodeList("suafbs", "global_nct", "geographicAreaM49")$code
+## itemCodes = GetCodeList("suafbs", "global_nct", "measuredItemCPC")$code
+## elementCodes = GetCodeList("suafbs", "global_nct", "measuredElement")$code
+## timeCodes = GetCodeList("suafbs", "global_nct", "timePointYearsSP")$code
+itemNames <- GetCodeList("suafbs", "global_nct", "measuredItemCPC"
+                          )[,.(code,Item=description)]
 
 data_key <- DatasetKey(
   domain = "suafbs",
@@ -148,10 +149,10 @@ glo <- GetData(data_key)
 edibleportion<-glo[measuredElement==1061]
 glo<-glo[measuredElement==1066]
 edi0 <- edibleportion[as.numeric(geographicAreaM49)!=0,
-                      .(geographicAreaM49, measuredItemCPC, 
+                      .(geographicAreaM49, measuredItemCPC,
                         EdiblePortion=Value)]
 edi <- edibleportion[as.numeric(geographicAreaM49)==0,
-                     .(measuredItemCPC, 
+                     .(measuredItemCPC,
                        EdiblePortionG=Value)]
 g0 <- glo[as.numeric(geographicAreaM49)!=0,
           .(geographicAreaM49,
@@ -160,13 +161,44 @@ glo <- glo[as.numeric(geographicAreaM49)==0,
            .(measuredItemCPC, Calories=Value)]
 
 
+## Get Commodity Tree
+
+
+data_key <- DatasetKey(
+  domain = "suafbs",
+  dataset = "ess_fbs_commodity_tree2",
+  dimensions = list(
+    measuredItemCPC =
+      Dimension("measuredItemParentCPC_tree",
+                GetCodeList("suafbs", "ess_fbs_commodity_tree2", "measuredItemParentCPC_tree")$code
+      ),
+    measuredItemCPC =
+      Dimension("measuredItemChildCPC_tree",
+                GetCodeList("suafbs", "ess_fbs_commodity_tree2", "measuredItemChildCPC_tree")$code
+      ),
+    measuredElement =
+      Dimension("measuredElementSuaFbs",
+                GetCodeList("suafbs", "ess_fbs_commodity_tree2", "measuredElementSuaFbs")$code
+      ),
+    geographicAreaM49 =
+      Dimension("geographicAreaM49",
+                GetCodeList("suafbs", "ess_fbs_commodity_tree2", "geographicAreaM49")$code
+      ),
+    timePointYearsSP =
+      Dimension("timePointYears",
+                GetCodeList("suafbs", "ess_fbs_commodity_tree2", "timePointYears")$code
+      )
+  )
+)
+#3 tree <- GetData(data_key)
+
 
 
 # fbs |> select(Area,Area_Code) |> unique() |>
 #     as.data.table() -> fbs.areas
 # fbs.areas[order(Area_Code)]->fbs.areas
 # fbs.areas$Area[c(82,175)] <- c("Code d'Ivore", "Turkey")
-# 
+#
 # fbs |> select(Element,Element_Code,Unit) |>
 #     unique() |> as.data.table() |>
 #     subset(Element_Code!=511) -> fbs.elements
@@ -181,16 +213,6 @@ glo <- glo[as.numeric(geographicAreaM49)==0,
 # fbs.elements[is.na(Scale),Scale:="Per capita"]
 # fbs.elements[,.(ElementNew=Element,Element_Code,Scale)]->fbs.elements
 
-# sua |> select(Element,Element_Code,Unit) |>
-#     unique() |> as.data.table() |>
-#     subset(Element_Code!=511) -> sua.elements
-# sua.elements[Unit=="t",Scale:="Quantity"]
-# sua.elements[Unit=="Kcal",Scale:="Calories"]
-# sua.elements[Unit=="g/cap/d",Scale:="Per capita"]
-# sua.elements[Unit=="kcal/cap/d",Scale:="Per capita"]
-# sua.elements[,.(ElementNew=Element,Element_Code,Scale)]->sua.elements
-# 
-# fbs |> filter(Series=="New") |> select(Year) |> unique() |> as.data.table()->yearrange
 
 # fbsplot <- function(data1=fbs1, data2=fbs2, item, percap, flag) {
 #     if (item != "All") {
@@ -208,8 +230,8 @@ glo <- glo[as.numeric(geographicAreaM49)==0,
 #                  width=0.3, size=0.1) +
 #         scale_fill_brewer(name="Utilization",palette="Set1", direction=-1)+
 #         facet_wrap(~Item, ncol=1, scales="free_y")->p
-# 
-# 
+#
+#
 #     if(percap==TRUE) {
 #         p <- p + scale_y_continuous("Kilograms per capita")
 #     } else if (item < 2000) {
@@ -227,7 +249,7 @@ glo <- glo[as.numeric(geographicAreaM49)==0,
 #             geom_text(data=data2,
 #                       aes(x=Year, y=Value, label=Flag,
 #                           group=Element), angle=90,
-# 
+#
 #                       position = position_stack(vjust = 0.5),
 #                       size=3,vjust="middle",lineheight=0.3
 #                       )
@@ -244,7 +266,9 @@ calplot <- function(data1=fbs1, data2=fbs2, data3=food,
         geom_bar_interactive(data = data1, stat="identity",
                              aes(x=Year,y=Value,group=Element,fill=Element,
                                  tooltip=paste0(Element," (",
-                                                round(Value),
+                                                round(Value), # ",",
+                                                ## flagObservationStatus, ",",
+                                                ## flagMethod,
                                                 ")")),
                  width=0.22, linewidth=0.1)+
         scale_fill_viridis_d(name="Supply (S)", direction=-1)+
@@ -308,12 +332,10 @@ priceplot <- function(pricedata){
 
 
 
-
-
 ui <- fluidPage(
-    titlePanel("Analysis of food balances"),
-    # includeCSS("../../solarized-dark.css"),
-    # includeCSS("../../styles.css"),
+    titlePanel("Analysis of Supply Utilization Accounts"),
+    includeCSS("solarized-dark.css"),
+    includeCSS("styles.css"),
     tabsetPanel(
         tabPanel("SUA data",
                  HTML("<br><br>"),
@@ -351,10 +373,18 @@ ui <- fluidPage(
                                                value=5
                                                ),
                                   actionButton("showcalplot", label="Plot"),
-                                  width=2),
+                                  width=3),
                      mainPanel(
                          id="maintab0",
-                         uiOutput("giraphcalplot")
+                         h3("Overall Balance"),
+                         uiOutput("giraphcalplot"),
+                         h3("Production of major crops"),
+                         uiOutput("prodplotout"),
+                         h3("Area and yield of major crops"),
+                         uiOutput("aylogplotout"),
+                         h3("Production of major livestock products"),
+                         h3("Population and yield of livestock"),
+                         h3("Animal feed and animal products"),
                          ))
                  )
         # tabPanel("Trends",
@@ -427,14 +457,391 @@ server <- function(input, output, session) {
     # output$selectitems <- renderTree({
     #     item.list
     # })
-    # 
+    #
     # output$selectmapitems <- renderTree({
     #     item.list
     # })
-    # 
+    #
     output$selectcalitems <- renderTree({
         suaitems
     })
+
+
+    toListen <- reactive({
+             list(input$showcalplot, input$prodplotout_selected)
+    })
+
+    observeEvent(toListen(), {
+        req(input$selectcalitems)
+        if(isTruthy(input$prodplotout_selected)) {
+            print(input$prodplotout_selected)
+        }
+
+      selected <-
+        get_selected(input$selectcalitems, format = "names")
+      selected <-
+        stringr::str_split_fixed(unlist(lapply(selected, `[[`, 1)), ": ", n = 2)[, 1]
+
+
+      timeKeys = c(input$selectcalyearsin[1]:input$selectcalyearsin[2])
+      timeDim <-
+        Dimension(name = "timePointYears", keys = as.character(timeKeys))
+
+      geoKeys = suaareas[description == input$selectcalcountriesin]$code
+      geoDim = Dimension(name = "geographicAreaM49", keys = geoKeys)
+
+
+      eleKeys = sua.elements$code
+      eleDim <-
+        Dimension(name = "measuredElementSuaFbs", keys = eleKeys)
+
+
+      # itemKeys = as.character(c("22230.03", "22230.04"))
+      itemDim <-
+        Dimension(name = "measuredItemFbsSua", keys = selected)
+
+
+      key = DatasetKey(
+        domain = "suafbs",
+        dataset = "sua_balanced",
+        dimensions = list(
+          geographicAreaM49 = geoDim,
+          measuredElementSuaFbs = eleDim,
+          measuredItemFbsSua = itemDim,
+          timePointYears = timeDim
+        )
+      )
+
+
+      #pull SUA data
+      suadata = GetData(key)
+      suadata <-
+        merge(suadata, sua.elements[, .(code, Element = description)],
+              by.x = "measuredElementSuaFbs", by.y = "code")
+      suadata <- suadata[!(Element %in% c("Opening Stocks [t]"))]
+
+      suadata <- merge(suadata, edi0,
+                       by.x = c("geographicAreaM49", "measuredItemFbsSua"),
+                       by.y = c("geographicAreaM49", "measuredItemCPC"),
+                       all.x = TRUE)
+      suadata <- merge(suadata, edi, by.x = "measuredItemFbsSua",
+                       by.y = "measuredItemCPC", all.x = TRUE)
+      suadata[is.na(EdiblePortion), EdiblePortion := EdiblePortionG]
+      suadata[, EdiblePortionG := NULL]
+      suadata <- merge(
+        suadata,
+        g0,
+        by.x = c("geographicAreaM49", "measuredItemFbsSua"),
+        by.y = c("geographicAreaM49", "measuredItemCPC"),
+        all.x = TRUE
+      )
+      suadata <- merge(suadata,
+                       glo,
+                       by.x = "measuredItemFbsSua",
+                       by.y = "measuredItemCPC",
+                       all.x = TRUE)
+      suadata[is.na(Conversion), Conversion := Calories]
+      suadata[, Calories := NULL]
+      gsub(" [t]", "", suadata$Element, fixed = TRUE) -> suadata$Element
+      suadata[measuredElementSuaFbs %in% as.character(c(5510, 5610, 5071)),
+              Side := "Supply"]
+      suadata[measuredElementSuaFbs %in% as.character(
+        c(5141, 5165, 5520, 5525, 5910, 5016, 5023, 5164, 5166)
+        ), Side := "Utilization"]
+      ## suadata[Value<0&Element_Code==5071,Side:="Utilization"]
+      ## suadata[Value<0&Element_Code==5071,Value:=-Value]
+      if (input$selectcalgm == "Calories") {
+        suadata[, Value := Value * EdiblePortion * 10000 * Conversion]
+        if (input$calpercapita == TRUE) {
+          plotunit <- "Kcal per capita per day"
+        } else {
+          plotunit <- "Kilocalories"
+        }
+      } else if (input$calpercapita == TRUE) {
+        suadata[, Value := Value * 1000000]
+        plotunit <- "Grams per capita per day"
+      } else {
+        plotunit <- "Tonnes"
+      }
+      suadata[measuredElementSuaFbs == "5071", Value := -Value]
+      if (input$calprocessing == FALSE) {
+        suadata[measuredElementSuaFbs == "5023", Value := -Value]
+        suadata[measuredElementSuaFbs == "5023", Element := "Production"]
+        suadata[measuredElementSuaFbs == "5023", Side := "Supply"]
+      }
+      if (input$calpercapita == TRUE) {
+        eleKeys = "511"
+        eleDim <-
+          Dimension(name = "measuredElementSuaFbs", keys = eleKeys)
+        itemDim <-
+          Dimension(name = "measuredItemFbsSua", keys = "S2501")
+
+        key = DatasetKey(
+          domain = "suafbs",
+          dataset = "fbs_balanced_",
+          dimensions = list(
+            geographicAreaM49 = geoDim,
+            measuredElementSuaFbs = eleDim,
+            measuredItemFbsSua = itemDim,
+            timePointYears = timeDim
+          )
+        )
+
+        pop <- GetData(key)[,.(geographicAreaM49,timePointYears,Pop=Value)]
+        suadata <- merge(suadata, pop,
+                         by = c("geographicAreaM49", "timePointYears"))
+        suadata[, Value := Value / (Pop * 1000 * 365)]
+      }
+      suadata[Element == "Tourist consumption", Element := "Residual other uses"]
+      suadata1 <- suadata[, .(Value = sum(Value, na.rm = TRUE),
+                              Item = "All"),
+                          .(Side, Element, Year=as.numeric(timePointYears))]
+      suadata1[Value < 0 &
+                 Element == "Stock Variation", Side := "Utilization"]
+      suadata1[Value < 0 &
+                 Element == "Stock Variation", Value := -Value]
+      fbs1 <- suadata1[Side == "Supply"]
+      fbs1[, Year := Year - 0.22]
+      fbs1$Element <- factor(fbs1$Element,
+                             levels = c("Import Quantity",
+                                        "Production", "Stock Variation"))
+      fbs2 <- suadata1[Side == "Utilization"]
+      ## fbs2[, Year := Year - 0.075]
+      ## fbs2[Element == "Food supply quantity (tonnes)", Element := "Food"]
+      fbs2[Element == "Loss", Element := "Losses"]
+      fbs2[Element == "Processed", Element := "Processing"]
+      food <- suadata[Element == "Food",
+                      .(Value = sum(Value, na.rm = TRUE)),
+                      .(code=measuredItemFbsSua,
+                      Year=as.numeric(timePointYears))
+                      ][order(-Value)]
+      food <- merge(food,itemNames, by ="code")
+      food[, calrank := rank(-Value), Year]
+      food[calrank > input$itemnos, Item := "Rest"]
+      food[calrank > input$itemnos, calrank := input$itemnos + 1]
+      food[Item=="Rest", code := NA]
+      food <- food[, .(Value = sum(Value)), .(Year, Item, code, calrank)]
+      food$Item <- factor(food$Item,
+                          levels = unique(food[, .(Item = unique(Item)),
+                                               calrank][order(calrank)]$Item))
+      food[, Year := Year + 0.22]
+
+      if (input$calprocessing == FALSE) {
+          fbs2$Element <- factor(fbs2$Element,
+                                 levels = rev(
+                                     c("Food", "Feed", "Seed",
+                                       "Industrial uses", "Export Quantity",
+                                       "Losses", "Residual other uses", "Stock Variation")))
+          utscale <- rev(
+              c(
+                  "#E41A1C",
+                  "#377EB8",
+                  "#4DAF4A",
+                  "#984EA3",
+                  "#FF7F00",
+                  "#FFFF33",
+                  "#A65628",
+                  "#440154"
+              )
+          )
+      } else {
+          fbs2$Element <- factor(fbs2$Element,
+                                 levels = rev(
+                                     c(
+                                         "Food",
+                                         "Feed",
+                                         "Seed",
+                                         "Processing",
+                                         "Industrial uses",
+                                         "Export Quantity",
+                                         "Losses",
+                                         "Residual other uses",
+                                         "Stock Variation"
+                                     )
+                                 ))
+          utscale <- rev(
+              c(
+                  "#E41A1C",
+                  "#377EB8",
+                  "#4DAF4A",
+                  "#984EA3",
+                  "#FF7F00",
+                  "#FFFF33",
+                  "#A65628",
+                  "#999999",
+                  "#440154"
+              )
+          )
+      }
+
+      ## Production data
+
+      ## areaCodes = GetCodeList("agriculture", "aproduction", "geographicAreaM49")$code
+      ## itemCodes = GetCodeList("agriculture", "aproduction", "measuredItemCPC")$code
+      ## elementCodes = GetCodeList("agriculture", "aproduction", "measuredElement")[,.(code,Item=description)]
+
+      ## timeCodes = GetCodeList("agriculture", "aproduction", "timePointYears")$code
+
+      itemNames <- GetCodeList("agriculture", "aproduction", "measuredItemCPC"
+                               )[,.(code,Item=description)]
+      geoKeys = suaareas[description == input$selectcalcountriesin]$code
+
+      data_key <- DatasetKey(
+        domain = "agriculture",
+        dataset = "aproduction",
+        dimensions = list(
+          measuredItemCPC =
+            Dimension("measuredItemCPC",
+                      itemNames[grep("^01", code), code]
+                      ),
+          measuredElement =
+            Dimension("measuredElement", c("5312","5421","5510")
+                      ),
+          geographicAreaM49 =
+            Dimension(name = "geographicAreaM49", keys = geoKeys),
+          timePointYears = timeDim
+        ))
+      cropprod <- GetData(data_key)
+      cropprod[, rank := rank(-Value), .(timePointYears,measuredElement)]
+      maincrops <- cropprod[ rank <= input$itemnos,unique(measuredItemCPC)]
+      topcrop <- cropprod[ rank == 1 & timePointYears==max(as.numeric(timePointYears)),
+                            unique(measuredItemCPC)]
+      cropprod <- cropprod[measuredItemCPC %in% maincrops]
+      cropprod <- merge(cropprod, itemNames, by.x="measuredItemCPC", by.y="code")
+      cropprod_p <- cropprod[measuredElement=="5510"]
+      cropprod_ay <- cropprod[measuredElement!="5510"]
+      cropprod_ay <- cropprod_ay[, Value := log(Value)]
+      if(isTruthy(input$prodplotout_selected)) {
+          cropprod_ay_sel <- cropprod_ay[measuredItemCPC %in% c(topcrop,input$prodplotout_selected)]
+      } else {
+          cropprod_ay_sel <- cropprod_ay[measuredItemCPC %in% topcrop]
+      }
+
+
+      ## Area: 5312
+      ## Yield: 5421
+
+
+
+      # cpricesDT <- cprices |>
+      #   ## filter(Element_Code!=5301)  |>
+      #   filter(as.character(Item_Code) %in% 23013) |>
+      #   filter(Year >= input$selecttrendyearsin[1] &
+      #            Year <= input$selecttrendyearsin[2]) |>
+      #   filter(Area %in% input$selectcalcountriesin) |>
+      #   as.data.table()
+      # cpricesDT <- cpricesDT[, .(Value = mean(Value)),
+      #                        .(Area, Year)]
+      p <- list()
+      ## for (i in 1:length(selected)) {X
+      p[[1]] <- calplot(
+        data1 = fbs1,
+        data2 = fbs2,
+        data3 = food,
+        percap = FALSE,
+        unit = plotunit,
+        fillscale = utscale
+      )
+
+      prodplot <- ggplot(cropprod_p,
+                         aes(x=timePointYears, y=Value,
+                             colour = Item,
+                             group = Item,
+                             tooltip =
+                                  paste0(Item," :", round(Value), " (",
+                                         flagObservationStatus, ",",
+                                         flagMethod, ")"),
+                             data_id = measuredItemCPC)) +
+          ggtitle("Production of main crops") +
+          geom_line_interactive() +
+          geom_point_interactive()
+
+      aylogplot <- ggplot(cropprod_ay_sel,
+                          aes(x=timePointYears, y=Value,
+                              fill = measuredElement,
+                              group = Item,
+                              tooltip =
+                                  paste0(round(Value)," (",
+                                         flagObservationStatus,",",
+                                         flagMethod,")"))) +
+          geom_bar_interactive(stat="identity")+
+          ggtitle("Area and yield of main crops") +
+          facet_wrap(~Item, scales="free_y")
+
+
+     p[[2]] <- prodplot
+     p[[3]] <- aylogplot
+
+      #p[[2]] <- priceplot(pricedata = cpricesDT)
+      ##       }
+      get_plot_output_list <- function() {
+        plot_output_list <- lapply(1:length(p), function(i) {
+          plotname <- paste("plot", i, sep = "")
+          ## plotname <- renderedplots[[i]]
+          plot_output_object  <-
+            girafeOutput(plotname, width = "100%", height = "700px")
+          plot_output_object  <- renderGirafe({
+            girafe(
+              ggobj = p[[i]],
+              options = list(
+                ## opts_sizing(rescale = TRUE,width=1),
+                ## opts_zoom = opts_zoom(min = 1, max = 4),
+                opts_selection(type = "single",
+                               css = "fill:yellow;stroke:gray;r:5pt;")
+              ),
+              width_svg = 12,
+              height_svg = 6
+            )
+          })
+        })
+        do.call(tagList, plot_output_list)
+        return(plot_output_list)
+      }
+
+
+      output$giraphcalplot <- renderUI({
+        get_plot_output_list()[[1]]
+      })
+
+      output$prodplotout <- renderUI({
+        get_plot_output_list()[[2]]
+      })
+
+      output$aylogplotout <- renderUI({
+        get_plot_output_list()[[3]]
+      })
+
+
+      ## outvalues$prodplot0  <- renderGirafe({
+      ##       girafe(
+      ##         ggobj = prodplot,
+      ##         options = list(
+      ##           ## opts_sizing(rescale = TRUE,width=1),
+      ##           ## opts_zoom = opts_zoom(min = 1, max = 4),
+      ##           opts_selection(type = "multiple",
+      ##                          css = "colour:yellow;stroke:gray;r:5pt;")
+      ##         ),
+      ##         width_svg = 12,
+      ##         height_svg = 6
+      ##       )
+      ##     }
+      ##     )
+
+      ## output$prodplot <- renderUI({
+      ##   prodplot
+      ## })
+
+
+    })
+
+
+
+}
+
+### Run the app ----
+
+shinyApp(ui = ui, server = server)
+
 
     # observeEvent(input$showplot,{
     #     req(input$selectcountriesin)
@@ -509,7 +916,7 @@ server <- function(input, output, session) {
     #                       percap=input$percapita, flag=input$flags)
     #         p[[i]] <- p1
     #     }
-    # 
+    #
     #     get_plot_output_list <- function() {
     #         plot_output_list <- lapply(1:length(p), function(i) {
     #             plotname <- paste("plot", i, sep="")
@@ -529,257 +936,10 @@ server <- function(input, output, session) {
     #         do.call(tagList, plot_output_list)
     #         return(plot_output_list)
     #     }
-    # 
+    #
     #     output$giraphplot <- renderUI({ get_plot_output_list() })
-    # 
+    #
     # })
-
-    observeEvent(input$showcalplot, {
-      selected <-
-        get_selected(input$selectcalitems, format = "names")
-      selected <-
-        stringr::str_split_fixed(unlist(lapply(selected, `[[`, 1)), ": ", n = 2)[, 1]
-      
-      
-      timeKeys = c(input$selectcalyearsin[1]:input$selectcalyearsin[2])
-      timeDim <-
-        Dimension(name = "timePointYears", keys = as.character(timeKeys))
-      
-      geoKeys = suaareas[description == input$selectcalcountriesin]$code
-      geoDim = Dimension(name = "geographicAreaM49", keys = geoKeys)
-      
-      
-      eleKeys = sua.elements$code
-      eleDim <-
-        Dimension(name = "measuredElementSuaFbs", keys = eleKeys)
-      
-      
-      # itemKeys = as.character(c("22230.03", "22230.04"))
-      itemDim <-
-        Dimension(name = "measuredItemFbsSua", keys = selected)
-      
-      
-      key = DatasetKey(
-        domain = "suafbs",
-        dataset = "sua_balanced",
-        dimensions = list(
-          geographicAreaM49 = geoDim,
-          measuredElementSuaFbs = eleDim,
-          measuredItemFbsSua = itemDim,
-          timePointYears = timeDim
-        )
-      )
-      
-      
-      #pull SUA data
-      suadata = GetData(key)
-      suadata <-
-        merge(suadata, sua.elements[, .(code, Element = description)], 
-              by.x = "measuredElementSuaFbs", by.y = "code")
-      suadata <- suadata[!(Element %in% c("Opening Stocks [t]"))]
-      
-      suadata <- merge(suadata, edi0,
-                       by.x = c("geographicAreaM49", "measuredItemFbsSua"),
-                       by.y = c("geographicAreaM49", "measuredItemCPC"),
-                       all.x = TRUE)
-      suadata <- merge(suadata, edi, by.x = "measuredItemFbsSua",
-                       by.y = "measuredItemCPC", all.x = TRUE)
-      suadata[is.na(EdiblePortion), EdiblePortion := EdiblePortionG]
-      suadata[, EdiblePortionG := NULL]
-      suadata <- merge(
-        suadata,
-        g0,
-        by.x = c("geographicAreaM49", "measuredItemFbsSua"),
-        by.y = c("geographicAreaM49", "measuredItemCPC"),
-        all.x = TRUE
-      )
-      suadata <- merge(suadata,
-                       glo,
-                       by.x = "measuredItemFbsSua",
-                       by.y = "measuredItemCPC",
-                       all.x = TRUE)
-      suadata[is.na(Conversion), Conversion := Calories]
-      suadata[, Calories := NULL]
-      gsub(" [t]", "", suadata$Element, fixed = TRUE) -> suadata$Element
-      suadata[measuredElementSuaFbs %in% as.character(c(5510, 5610, 5071)),
-              Side := "Supply"]
-      suadata[measuredElementSuaFbs %in% as.character(
-        c(5141, 5165, 5520, 5525, 5910, 5016, 5023, 5164, 5166)
-        ), Side := "Utilization"]
-      ## suadata[Value<0&Element_Code==5071,Side:="Utilization"]
-      ## suadata[Value<0&Element_Code==5071,Value:=-Value]
-      if (input$selectcalgm == "Calories") {
-        suadata[, Value := Value * EdiblePortion * 10000 * Conversion]
-        if (input$calpercapita == TRUE) {
-          plotunit <- "Kcal per capita per day"
-        } else {
-          plotunit <- "Kilocalories"
-        } 
-      } else if (input$calpercapita == TRUE) {
-        suadata[, Value := Value * 1000000]
-        plotunit <- "Grams per capita per day"
-      } else {
-        plotunit <- "Tonnes"
-      }
-      suadata[measuredElementSuaFbs == "5071", Value := -Value]
-      if (input$calprocessing == FALSE) {
-        suadata[measuredElementSuaFbs == "5023", Value := -Value]
-        suadata[measuredElementSuaFbs == "5023", Element := "Production"]
-        suadata[measuredElementSuaFbs == "5023", Side := "Supply"]
-      }
-      if (input$calpercapita == TRUE) {
-        eleKeys = "511"
-        eleDim <-
-          Dimension(name = "measuredElementSuaFbs", keys = eleKeys)
-        itemDim <-
-          Dimension(name = "measuredItemFbsSua", keys = "S2501")
-        
-        key = DatasetKey(
-          domain = "suafbs",
-          dataset = "fbs_balanced_",
-          dimensions = list(
-            geographicAreaM49 = geoDim,
-            measuredElementSuaFbs = eleDim,
-            measuredItemFbsSua = itemDim,
-            timePointYears = timeDim
-          )
-        )
-        
-        pop <- GetData(key)[,.(geographicAreaM49,timePointYears,Pop=Value)]
-        suadata <- merge(suadata, pop, 
-                         by = c("geographicAreaM49", "timePointYears"))
-        suadata[, Value := Value / (Pop * 1000 * 365)]
-      }
-      suadata[Element == "Tourist consumption", Element := "Residual other uses"]
-      suadata1 <- suadata[, .(Value = sum(Value, na.rm = TRUE),
-                              Item = "All"),
-                          .(Side, Element, Year=as.numeric(timePointYears))]
-      suadata1[Value < 0 &
-                 Element == "Stock Variation", Side := "Utilization"]
-      suadata1[Value < 0 &
-                 Element == "Stock Variation", Value := -Value]
-      fbs1 <- suadata1[Side == "Supply"]
-      fbs1[, Year := Year - 0.22]
-      fbs1$Element <- factor(fbs1$Element,
-                             levels = c("Import Quantity",
-                                        "Production", "Stock Variation"))
-      fbs2 <- suadata1[Side == "Utilization"]
-      ## fbs2[, Year := Year - 0.075]
-      ## fbs2[Element == "Food supply quantity (tonnes)", Element := "Food"]
-      fbs2[Element == "Loss", Element := "Losses"]
-      fbs2[Element == "Processed", Element := "Processing"]
-      food <- suadata[Element == "Food",
-                      .(Value = sum(Value, na.rm = TRUE)),
-                      .(code=measuredItemFbsSua, Year=as.numeric(timePointYears))][order(-Value)]
-      food <- merge(food,itemNames, by ="code")
-      food[, calrank := rank(-Value), Year]
-      food[calrank > input$itemnos, Item := "Rest"]
-      food[calrank > input$itemnos, calrank := input$itemnos + 1]
-      food <- food[, .(Value = sum(Value)), .(Year, Item, calrank)]
-      food$Item <- factor(food$Item,
-                          levels = unique(food[, .(Item = unique(Item)),
-                                               calrank][order(calrank)]$Item))
-      food[, Year := Year + 0.22]
-      
-      if (input$calprocessing == FALSE) {
-        fbs2$Element <- factor(fbs2$Element,
-                               levels = rev(
-                                 c("Food", "Feed", "Seed", 
-                                   "Industrial uses", "Export Quantity",
-                                   "Losses", "Residual other uses", "Stock Variation")))
-        utscale <- rev(
-          c(
-            "#E41A1C",
-            "#377EB8",
-            "#4DAF4A",
-            "#984EA3",
-            "#FF7F00",
-            "#FFFF33",
-            "#A65628",
-            "#440154"
-          )
-        )
-      } else {
-        fbs2$Element <- factor(fbs2$Element,
-                               levels = rev(
-                                 c(
-                                   "Food",
-                                   "Feed",
-                                   "Seed",
-                                   "Processing",
-                                   "Industrial uses",
-                                   "Export Quantity",
-                                   "Losses",
-                                   "Residual other uses",
-                                   "Stock Variation"
-                                 )
-                               ))
-        utscale <- rev(
-          c(
-            "#E41A1C",
-            "#377EB8",
-            "#4DAF4A",
-            "#984EA3",
-            "#FF7F00",
-            "#FFFF33",
-            "#A65628",
-            "#999999",
-            "#440154"
-          )
-        )
-      }
-      # cpricesDT <- cprices |>
-      #   ## filter(Element_Code!=5301)  |>
-      #   filter(as.character(Item_Code) %in% 23013) |>
-      #   filter(Year >= input$selecttrendyearsin[1] &
-      #            Year <= input$selecttrendyearsin[2]) |>
-      #   filter(Area %in% input$selectcalcountriesin) |>
-      #   as.data.table()
-      # cpricesDT <- cpricesDT[, .(Value = mean(Value)),
-      #                        .(Area, Year)]
-      p <- list()
-      ## for (i in 1:length(selected)) {
-      p[[1]] <- calplot(
-        data1 = fbs1,
-        data2 = fbs2,
-        data3 = food,
-        percap = FALSE,
-        unit = plotunit,
-        fillscale = utscale
-      )
-      #p[[2]] <- priceplot(pricedata = cpricesDT)
-      ##       }
-      get_plot_output_list <- function() {
-        plot_output_list <- lapply(1:length(p), function(i) {
-          plotname <- paste("plot", i, sep = "")
-          ## plotname <- renderedplots[[i]]
-          plot_output_object  <-
-            girafeOutput(plotname, width = "100%", height = "700px")
-          plot_output_object  <- renderGirafe({
-            girafe(
-              ggobj = p[[i]],
-              options = list(
-                ## opts_sizing(rescale = TRUE,width=1),
-                ## opts_zoom = opts_zoom(min = 1, max = 4),
-                opts_selection(type = "single",
-                               css = "fill:yellow;stroke:gray;r:5pt;")
-              ),
-              width_svg = 12,
-              height_svg = 6
-            )
-          })
-        })
-        do.call(tagList, plot_output_list)
-        return(plot_output_list)
-      }
-      
-      
-      output$giraphcalplot <- renderUI({
-        get_plot_output_list()
-      })
-      
-    })
-    
 
     # observeEvent(input$showmap,{
     #     req(input$selectmapyearsin)
@@ -831,7 +991,7 @@ server <- function(input, output, session) {
     #     outvalues$plotlyplot<-g
     #     outvalues$plotcaption<-paste0(input$mapselectvariable1,", ",
     #                                   input$mapyear)
-    # 
+    #
     #     output$mapcaption<-renderPrint({HTML(paste0("<h3>",outvalues$plotcaption,"</h3>"))})
     #     output$giraphmapplot<-renderGirafe(girafe(ggobj = outvalues$plotlyplot,
     #                                               options = list(
@@ -842,11 +1002,5 @@ server <- function(input, output, session) {
     #                                                                  only_shiny = FALSE)
     #                                               ),
     #                                               width_svg=12,height_svg=8))
-    # 
+    #
     # })
-
-}
-
-### Run the app ----
-
-shinyApp(ui = ui, server = server)
