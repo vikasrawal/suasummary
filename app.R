@@ -1,12 +1,22 @@
-                                        #setwd("~/vikas/suasummary")
+#setwd("~/vikas/suasummary")
 # renv::init()
 #install.packages("faosws", repos="https://rstudiopm.fao.org/fao-sws-cran/latest" )
 #install.packages("faoswsUtil", repos="https://rstudiopm.fao.org/fao-sws-cran/latest" )
 #install.packages("faoswsModules", repos="https://rstudiopm.fao.org/fao-sws-cran/latest" )
-if (!require("Require")) {install.packages("Require"); require("Require")}
+#install.packages("faoswsFeed", repos="https://rstudiopm.fao.org/fao-sws-cran/latest" )
+#install.packages("~/fao2025/sws-stat-faoswsfeed", repos=NULL, type="source")
+#install.packages("faoswsEnsure", repos="https://rstudiopm.fao.org/fao-sws-cran/latest" )
+# install.packages("faoswsProduction", repos="https://rstudiopm.fao.org/fao-sws-cran/latest" )
+# install.packages("faoswsModules", repos="https://rstudiopm.fao.org/fao-sws-cran/latest" )
+# install.packages("faoswsTrade", repos="https://rstudiopm.fao.org/fao-sws-cran/latest" )
+
+if (!require("Require")) {
+   install.packages("Require"); require("Require")
+   }
 library(faosws)
 library(faoswsModules)
 library(faoswsUtil)
+library(faoswsFeed)
 Require(data.table)
 Require(dplyr)
 Require(tidyr)
@@ -22,10 +32,10 @@ Require(shinyTree)
 Require(paletteer)
 Require(rrapply)
 
-options(scipen=999999)
-colorred="#ca0020"
-colorgreen="#1a9641"
-colorblue="#0571b0"
+options(scipen = 999999)
+colorred <- "#ca0020"
+colorgreen <- "#1a9641"
+colorblue <- "#0571b0"
 #scales::muted("green")
 
 
@@ -37,17 +47,42 @@ if(CheckDebug()){
   library(faoswsModules)
   SETT <- ReadSettings("sws.yml")
 
-  #R_SWS_SHARE_PATH <- SETT[["share"]]
-  ## Get SWS Parameters
-##  SetClientFiles()
   GetTestEnvironment(
     baseUrl = SETT[["server"]],
     token = SETT[["token"]]
   )
 }
 
+suaareas <- GetCodeList(
+  domain = "suafbs", dataset = "sua_balanced",
+  "geographicAreaM49"
+)
+suaareas <- suaareas[is.na(endDate)|endDate=="9999-12-31"][
+  type=="country"][
+    !is.na(endDate)]
+yearrange <- GetCodeList(
+  domain = "suafbs", dataset = "sua_balanced",
+  "timePointYears"
+)
+
+yearrange <- yearrange[as.numeric(code)>2010 & as.numeric(code) < as.numeric(format(Sys.Date(), "%Y"))-1]
+yearrange[ , code := as.numeric(code)]
+
+sua.elements <- GetCodeList(domain="suafbs", dataset = "sua_balanced",
+                            "measuredElementSuaFbs")
+sua.elements <- sua.elements[code %in% c("5016", "5023", "5071", "5141",
+                                         "5113", "5141", "5164", "5165",
+                                         "5166", "5510", "5520", "5610",
+                                         "5910", "5525")]
+
+sua.elements$description <- gsub(" [t]","", sua.elements$description)
+
+## prodelements = GetCodeList(domain = "production", dataset = "aproduction",
+##                            "measuredElement")[
 suaareas = GetCodeList(domain = "suafbs", dataset = "sua_balanced", "geographicAreaM49")
+
 suaareas <- suaareas[is.na(endDate)|endDate=="9999-12-31"][type=="country"][!is.na(endDate)]
+
 yearrange = GetCodeList(domain = "suafbs", dataset = "sua_balanced", "timePointYears")
 
 yearrange <- yearrange[as.numeric(code)>2010 & as.numeric(code) < as.numeric(format(Sys.Date(), "%Y"))-1]
@@ -61,6 +96,23 @@ sua.elements <- sua.elements[code %in% c("5016", "5023", "5071", "5141",
                                          "5910", "5525")]
 
 sua.elements$description <- gsub(" [t]","", sua.elements$description)
+
+prodelements = GetCodeList(domain = "production", dataset = "aproduction",
+                           "measuredElement")[,.(code,description)]
+proditems = GetCodeList(domain = "production", dataset = "aproduction",
+                        "measuredItemCPC")[,.(code,description)]
+
+# open_dataset("data/fbs") ->fbs
+# open_dataset("sua") ->sua
+# open_dataset("data/consumerprices") ->cprices
+
+# sua.item.list <- readRDS("data/suaitemlist.rds")
+# item.list <- readRDS("data/fbssuaitemlist.rds")
+
+suaitems = GetCodeList(domain = "suafbs", dataset = "sua_balanced",
+                       "measuredItemFbsSua")[,.(code,description)]
+proditems = GetCodeList(domain = "production", dataset = "aproduction",
+                        "measuredItemCPC")[,.(code,description)]
 
 # open_dataset("data/fbs") ->fbs
 # open_dataset("sua") ->sua
@@ -372,6 +424,8 @@ ui <- fluidPage(
                                                min=1, max=7,
                                                value=5
                                                ),
+                                  h3("Select the items/groups for which you want to see the production nd yield statistics:"),
+                                  shinyTree("selectproditems", checkbox=TRUE),
                                   actionButton("showcalplot", label="Plot"),
                                   width=3),
                      mainPanel(
@@ -379,8 +433,15 @@ ui <- fluidPage(
                          h3("Overall Balance"),
                          uiOutput("giraphcalplot"),
                          h3("Production of major crops"),
-                         uiOutput("prodplotout"),
+                         ## uiOutput("prodplotout"),
+                         girafeOutput("prodplotout", width = "100%", height = "700px"),
+                         h3("Area harvested of major crops"),
+                         uiOutput("areaplotout"),
                          h3("Area and yield of major crops"),
+                         selectInput("selectareayield",
+                                     "Select which variable to plot on the y-axis",
+                                     choices=c("Area", "Yield"),
+                                     selected="Yield"),
                          uiOutput("aylogplotout"),
                          h3("Production of major livestock products"),
                          h3("Population and yield of livestock"),
@@ -466,17 +527,16 @@ server <- function(input, output, session) {
         suaitems
     })
 
+    output$selectproditems <- renderTree({
+        suaitems
+    })
 
     toListen <- reactive({
-             list(input$showcalplot, input$prodplotout_selected)
+             list(input$showcalplot, input$prodplotout_selected, input$selectareayield)
     })
 
     observeEvent(toListen(), {
         req(input$selectcalitems)
-        if(isTruthy(input$prodplotout_selected)) {
-            print(input$prodplotout_selected)
-        }
-
       selected <-
         get_selected(input$selectcalitems, format = "names")
       selected <-
@@ -511,7 +571,6 @@ server <- function(input, output, session) {
           timePointYears = timeDim
         )
       )
-
 
       #pull SUA data
       suadata = GetData(key)
@@ -682,156 +741,238 @@ server <- function(input, output, session) {
 
       ## timeCodes = GetCodeList("agriculture", "aproduction", "timePointYears")$code
 
-      itemNames <- GetCodeList("agriculture", "aproduction", "measuredItemCPC"
-                               )[,.(code,Item=description)]
-      geoKeys = suaareas[description == input$selectcalcountriesin]$code
+        itemNames <- GetCodeList("agriculture", "aproduction", "measuredItemCPC"
+                                 )[,.(code,Item=description)]
+        geoKeys = suaareas[description == input$selectcalcountriesin]$code
 
-      data_key <- DatasetKey(
-        domain = "agriculture",
-        dataset = "aproduction",
-        dimensions = list(
-          measuredItemCPC =
-            Dimension("measuredItemCPC",
-                      itemNames[grep("^01", code), code]
-                      ),
-          measuredElement =
-            Dimension("measuredElement", c("5312","5421","5510")
-                      ),
-          geographicAreaM49 =
-            Dimension(name = "geographicAreaM49", keys = geoKeys),
-          timePointYears = timeDim
-        ))
-      cropprod <- GetData(data_key)
-      cropprod[, rank := rank(-Value), .(timePointYears,measuredElement)]
-      maincrops <- cropprod[ rank <= input$itemnos,unique(measuredItemCPC)]
-      topcrop <- cropprod[ rank == 1 & timePointYears==max(as.numeric(timePointYears)),
+        data_key <- DatasetKey(
+            domain = "agriculture",
+            dataset = "aproduction",
+            dimensions = list(
+                measuredItemCPC =
+                    Dimension("measuredItemCPC",
+                              itemNames[grep("^01", code), code]
+                              ),
+                measuredElement =
+                    Dimension("measuredElement", c("5312","5421","5510")
+                              ),
+                geographicAreaM49 =
+                    Dimension(name = "geographicAreaM49", keys = geoKeys),
+                timePointYears = timeDim
+            ))
+        cropprod <- GetData(data_key)
+        cropprod[, rank := rank(-Value), .(timePointYears,measuredElement)]
+        maincrops <- cropprod[ rank <= input$itemnos,unique(measuredItemCPC)]
+        topcrop <- cropprod[ rank == 1 & timePointYears==max(as.numeric(timePointYears))
+                            & measuredElement=="5312",
+                            unique(measuredItemCPC) ]
+        cropprod <- merge(cropprod, itemNames, by.x="measuredItemCPC", by.y="code")
+        cropprod0 <- cropprod[measuredItemCPC %in% maincrops]
+        cropprod_p <- cropprod0[measuredElement=="5510"]
+        cropprod_ay <- cropprod0[measuredElement!="5510"]
+        cropprod_ay <- cropprod_ay[, LogValue := log(Value)]
+        cropprod_ay$Element <- ifelse(cropprod_ay$measuredElement=="5312","Area","Yield")
+        if(isTruthy(input$prodplotout_selected)) {
+            cropprod_ay_sel <- cropprod_ay[measuredItemCPC %in% c(topcrop,input$prodplotout_selected)]
+        } else {
+            cropprod_ay_sel <- cropprod_ay[measuredItemCPC %in% topcrop]
+        }
+        data_key <- DatasetKey(
+            domain = "agriculture",
+            dataset = "aproduction",
+            dimensions = list(
+                measuredItemCPC =
+                    Dimension("measuredItemCPC",
+                              itemNames[grep("^02", code), code]
+                              ),
+
+                measuredElement =
+                Dimension("measuredElement",
+                          GetCodeList("production", "aproduction", "measuredElement")$code
+                          #Dimension("measuredElement", c("5312","5421","5510")
+                              ),
+                geographicAreaM49 =
+                    Dimension(name = "geographicAreaM49", keys = geoKeys),
+                timePointYears = timeDim
+            ))
+        aniprod <- GetData(data_key)
+        aniprod <- merge(aniprod, prodelements, by.x="measuredElement",
+                         by.y="code", all.x=TRUE)
+        aniprod <- merge(aniprod, proditems[,.(code,item_description=description)],
+                         by.x="measuredItemCPC",
+                         by.y="code", all.x=TRUE)
+        aniprod[, rank := rank(-Value), .(timePointYears,measuredElement)]
+        mainani <- aniprod[ rank <= input$itemnos,unique(measuredItemCPC)]
+        topcrop <- aniprod[ rank == 1 & timePointYears==max(as.numeric(timePointYears)),
                             unique(measuredItemCPC)]
-      cropprod <- cropprod[measuredItemCPC %in% maincrops]
-      cropprod <- merge(cropprod, itemNames, by.x="measuredItemCPC", by.y="code")
-      cropprod_p <- cropprod[measuredElement=="5510"]
-      cropprod_ay <- cropprod[measuredElement!="5510"]
-      cropprod_ay <- cropprod_ay[, Value := log(Value)]
-      if(isTruthy(input$prodplotout_selected)) {
-          cropprod_ay_sel <- cropprod_ay[measuredItemCPC %in% c(topcrop,input$prodplotout_selected)]
-      } else {
-          cropprod_ay_sel <- cropprod_ay[measuredItemCPC %in% topcrop]
-      }
+        aniprod <- aniprod[measuredItemCPC %in% mainani]
+        aniprod <- merge(aniprod, itemNames, by.x="measuredItemCPC", by.y="code")
+        aniprod_p <- aniprod[measuredElement=="5510"]
+        aniprod_ay <- aniprod[measuredElement!="5510"]
+        aniprod_ay <- aniprod_ay[, LogValue := log(Value)]
+        aniprod_ay$Element <- ifelse(aniprod_ay$measuredElement=="5312","Area","Yield")
+        ## if(isTruthy(input$prodplotout_selected)) {
+        ##     cropprod_ay_sel <- cropprod_ay[measuredItemCPC %in% c(topcrop,input$prodplotout_selected)]
+        ## } else {
+        ##     cropprod_ay_sel <- cropprod_ay[measuredItemCPC %in% topcrop]
+        ## }
+
+        ## Area: 5312
+        ## Yield: 5421
 
 
-      ## Area: 5312
-      ## Yield: 5421
+
+        ## cpricesDT <- cprices |>
+        ##   ## filter(Element_Code!=5301)  |>
+        ##   filter(as.character(Item_Code) %in% 23013) |>
+        ##   filter(Year >= input$selecttrendyearsin[1] &
+        ##            Year <= input$selecttrendyearsin[2]) |>
+        ##   filter(Area %in% input$selectcalcountriesin) |>
+        ##   as.data.table()
+        ## cpricesDT <- cpricesDT[, .(Value = mean(Value)),
+        ##                        .(Area, Year)]
+        p <- list()
+        ## for (i in 1:length(selected)) {X
+        p[[1]] <- calplot(
+            data1 = fbs1,
+            data2 = fbs2,
+            data3 = food,
+            percap = FALSE,
+            unit = plotunit,
+            fillscale = utscale
+        )
+
+        prodplot <- ggplot(cropprod_p,
+                           aes(x=timePointYears, y=Value,
+                               colour = Item,
+                               group = Item,
+                               tooltip =
+                                   paste0(Item," :", round(Value), " (",
+                                          flagObservationStatus, ",",
+                                          flagMethod, ")")
+                               )) +
+            ggtitle("Production of main crops") +
+            geom_line_interactive() +
+            geom_point_interactive(aes(data_id = measuredItemCPC))
+
+        if (input$selectareayield=="Yield") {
+            yvar="LogValue_Yield"
+            xvar="LogValue_Area"
+            othervar="Area"
+        } else {
+            yvar="LogValue_Area"
+            xvar="LogValue_Yield"
+            othervar="Yield"
+        }
+        ## aylogplot <- ggplot(cropprod_ay_sel,
+        ##                     aes(x=timePointYears, y=LogValue,
+        ##                         fill = Element,
+        ##                         group = Item,
+        ##                         tooltip =
+        ##                             paste0(round(Value, 3)," (",
+        ##                                    flagObservationStatus,",",
+        ##                                    flagMethod,")"))) #+
+        cropprod[!(measuredItemCPC %in% maincrops), Item := "Other crops"]
+        areaplotdata <- cropprod[measuredElement=="5312",
+                                 .(GCA=sum(Value, na.rm=TRUE)),
+                                 .(Year=timePointYears, Item)]
+        areaplot <- ggplot(areaplotdata,
+                           aes(x=Year, y=GCA, fill=Item))+
+          geom_bar_interactive(stat="identity",
+                               aes(tooltip=paste0(Item," (",
+                                                  round(GCA),
+                                                  ")")),
+                               width=0.8, linewidth=0.1) +
+          scale_fill_discrete(name="Crops") +
+          theme_classic() +
+          theme(panel.spacing.x = unit(0.1, "lines"),
+                strip.background=element_rect(color = NA))
+
+        cropprod_ay_sel <- dcast(cropprod_ay_sel, Item+timePointYears~Element,
+                                 value.var=c("Value","LogValue"))
+        aylogplot <- ggplot(cropprod_ay_sel) +
+            geom_rect_interactive(aes(xmin=0, xmax=get(xvar),
+                                      ymin=0, ymax=get(yvar),
+                                      tooltip = paste0("(", round(get(xvar),1),
+                                                       ",", round(get(yvar))),
+                                      fill=Item)) +
+            scale_y_continuous(paste0("Log of ",input$selectareayield)) +
+            scale_x_continuous(paste0("Log of ",othervar)) +
+            facet_grid(Item~timePointYears, scale="free_y") +
+            theme_classic() +
+            theme(panel.spacing.x = unit(0.1, "lines"),
+                  strip.background=element_rect(color = NA))
 
 
-
-      # cpricesDT <- cprices |>
-      #   ## filter(Element_Code!=5301)  |>
-      #   filter(as.character(Item_Code) %in% 23013) |>
-      #   filter(Year >= input$selecttrendyearsin[1] &
-      #            Year <= input$selecttrendyearsin[2]) |>
-      #   filter(Area %in% input$selectcalcountriesin) |>
-      #   as.data.table()
-      # cpricesDT <- cpricesDT[, .(Value = mean(Value)),
-      #                        .(Area, Year)]
-      p <- list()
-      ## for (i in 1:length(selected)) {X
-      p[[1]] <- calplot(
-        data1 = fbs1,
-        data2 = fbs2,
-        data3 = food,
-        percap = FALSE,
-        unit = plotunit,
-        fillscale = utscale
-      )
-
-      prodplot <- ggplot(cropprod_p,
-                         aes(x=timePointYears, y=Value,
-                             colour = Item,
-                             group = Item,
-                             tooltip =
-                                  paste0(Item," :", round(Value), " (",
-                                         flagObservationStatus, ",",
-                                         flagMethod, ")"),
-                             data_id = measuredItemCPC)) +
-          ggtitle("Production of main crops") +
-          geom_line_interactive() +
-          geom_point_interactive()
-
-      aylogplot <- ggplot(cropprod_ay_sel,
-                          aes(x=timePointYears, y=Value,
-                              fill = measuredElement,
-                              group = Item,
-                              tooltip =
-                                  paste0(round(Value)," (",
-                                         flagObservationStatus,",",
-                                         flagMethod,")"))) +
-          geom_bar_interactive(stat="identity")+
-          ggtitle("Area and yield of main crops") +
-          facet_wrap(~Item, scales="free_y")
+                            ## aes(x=timePointYears, y=LogValue,
+                            ##     fill = Element,
+                            ##     group = Item,
+                            ##     tooltip =
+                            ##         paste0(round(Value, 3)," (",
+                            ##                flagObservationStatus,",",
+                            ##                flagMethod,")"))) #+
 
 
-     p[[2]] <- prodplot
-     p[[3]] <- aylogplot
+    ## geom_bar_interactive(stat="identity")+
+    ##         scale_y_continuous("Log") +XS
+    ##         ggtitle("Area and yield of main crops") +
+    ##         facet_wrap(~Item, scales="free_y")
 
-      #p[[2]] <- priceplot(pricedata = cpricesDT)
-      ##       }
-      get_plot_output_list <- function() {
-        plot_output_list <- lapply(1:length(p), function(i) {
-          plotname <- paste("plot", i, sep = "")
-          ## plotname <- renderedplots[[i]]
-          plot_output_object  <-
-            girafeOutput(plotname, width = "100%", height = "700px")
-          plot_output_object  <- renderGirafe({
+        p[[2]] <- areaplot
+        p[[3]] <- prodplot
+        p[[4]] <- aylogplot
+
+        ##p[[2]] <- priceplot(pricedata = cpricesDT)
+        get_plot_output_list <- function() {
+            plot_output_list <- lapply(1:length(p), function(i) {
+                plotname <- paste("plot", i, sep = "")
+                ## plotname <- renderedplots[[i]]
+                plot_output_object  <-
+                    girafeOutput(plotname, width = "100%", height = "700px")
+                plot_output_object  <- renderGirafe({
+                    girafe(
+                        ggobj = p[[i]],
+                        options = list(
+                            ## opts_sizing(rescale = TRUE,width=1),
+                            ## opts_zoom = opts_zoom(min = 1, max = 4),
+                            opts_selection(type = "single",
+                                           css = "fill:yellow;stroke:gray;r:5pt;")
+                        ),
+                        width_svg = 12,
+                        height_svg = 6
+                    )
+                })
+            })
+            do.call(tagList, plot_output_list)
+            return(plot_output_list)
+        }
+
+        output$prodplotout  <- renderGirafe({
             girafe(
-              ggobj = p[[i]],
-              options = list(
-                ## opts_sizing(rescale = TRUE,width=1),
-                ## opts_zoom = opts_zoom(min = 1, max = 4),
-                opts_selection(type = "single",
-                               css = "fill:yellow;stroke:gray;r:5pt;")
-              ),
-              width_svg = 12,
-              height_svg = 6
+                ggobj = prodplot,
+                options = list(
+                    ## opts_sizing(rescale = TRUE,width=1),
+                    ## opts_zoom = opts_zoom(min = 1, max = 4),
+                    opts_selection(type = "single",
+                                   css = "fill:yellow;stroke:gray;r:5pt;")
+                ),
+                width_svg = 12,
+                height_svg = 6
             )
-          })
         })
-        do.call(tagList, plot_output_list)
-        return(plot_output_list)
-      }
 
 
-      output$giraphcalplot <- renderUI({
-        get_plot_output_list()[[1]]
-      })
+        output$giraphcalplot <- renderUI({
+            get_plot_output_list()[[1]]
+        })
 
-      output$prodplotout <- renderUI({
-        get_plot_output_list()[[2]]
-      })
+        output$areaplotout <- renderUI({
+            get_plot_output_list()[[2]]
+        })
 
-      output$aylogplotout <- renderUI({
-        get_plot_output_list()[[3]]
-      })
-
-
-      ## outvalues$prodplot0  <- renderGirafe({
-      ##       girafe(
-      ##         ggobj = prodplot,
-      ##         options = list(
-      ##           ## opts_sizing(rescale = TRUE,width=1),
-      ##           ## opts_zoom = opts_zoom(min = 1, max = 4),
-      ##           opts_selection(type = "multiple",
-      ##                          css = "colour:yellow;stroke:gray;r:5pt;")
-      ##         ),
-      ##         width_svg = 12,
-      ##         height_svg = 6
-      ##       )
-      ##     }
-      ##     )
-
-      ## output$prodplot <- renderUI({
-      ##   prodplot
-      ## })
-
-
+        output$aylogplotout <- renderUI({
+            get_plot_output_list()[[4]]
+        })
     })
 
 
