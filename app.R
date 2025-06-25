@@ -872,10 +872,21 @@ server <- function(input, output, session) {
         ##                             paste0(round(Value, 3)," (",
         ##                                    flagObservationStatus,",",
         ##                                    flagMethod,")"))) #+
-        cropprod[!(measuredItemCPC %in% maincrops), Item := "Other crops"]
-        areaplotdata <- cropprod[measuredElement=="5312",
-                                 .(GCA=sum(Value, na.rm=TRUE)),
-                                 .(Year=timePointYears, Item)]
+        areaplotdata <- cropprod[measuredElement=="5312"]
+        areaplotdata[, timePointYears := as.numeric(timePointYears)]
+        maincrops <- areaplotdata[timePointYears==max(timePointYears),
+                                  .(Item = unique(Item)),
+                                  .(rank(-Value))][rank<=input$itemnos, Item]
+        areaplotdata[!(Item %in% maincrops), Item := "Other crops"]
+        areaplotdata <- areaplotdata[, .(GCA=sum(Value, na.rm=TRUE)),
+                                     .(Year=timePointYears, Item)]
+
+        areaplotdata$Item <- factor(areaplotdata$Item,
+                                    levels = areaplotdata[Year==max(Year),
+                                                          .(Item = unique(Item)),
+                                                          .(rank(-GCA))][
+                                      order(rank)]$Item)
+
         areaplot <- ggplot(areaplotdata,
                            aes(x=Year, y=GCA, fill=Item))+
           geom_bar_interactive(stat="identity",
@@ -883,7 +894,9 @@ server <- function(input, output, session) {
                                                   round(GCA),
                                                   ")")),
                                width=0.8, linewidth=0.1) +
-          scale_fill_discrete(name="Crops") +
+          scale_y_continuous("Hectares") +
+          paletteer::scale_fill_paletteer_d("PrettyCols::Autumn", name="Crops",
+                          guide = guide_legend(position="bottom")) +
           theme_classic() +
           theme(panel.spacing.x = unit(0.1, "lines"),
                 strip.background=element_rect(color = NA))
