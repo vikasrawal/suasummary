@@ -1,36 +1,39 @@
 #setwd("~/vikas/suasummary")
-# renv::init()
-#install.packages("faosws", repos="https://rstudiopm.fao.org/fao-sws-cran/latest" )
-#install.packages("faoswsUtil", repos="https://rstudiopm.fao.org/fao-sws-cran/latest" )
-#install.packages("faoswsModules", repos="https://rstudiopm.fao.org/fao-sws-cran/latest" )
-#install.packages("faoswsFeed", repos="https://rstudiopm.fao.org/fao-sws-cran/latest" )
-#install.packages("~/fao2025/sws-stat-faoswsfeed", repos=NULL, type="source")
-#install.packages("faoswsEnsure", repos="https://rstudiopm.fao.org/fao-sws-cran/latest" )
-# install.packages("faoswsProduction", repos="https://rstudiopm.fao.org/fao-sws-cran/latest" )
-# install.packages("faoswsModules", repos="https://rstudiopm.fao.org/fao-sws-cran/latest" )
-# install.packages("faoswsTrade", repos="https://rstudiopm.fao.org/fao-sws-cran/latest" )
 
-if (!require("Require")) {
-   install.packages("Require"); require("Require")
-   }
+repos <- c(#CRAN = "https://cloud.r-project.org",
+           FAO = "https://rstudiopm.fao.org/fao-sws-cran/latest")
+options(repos = repos)
+# renv::init()
+# install.packages("faosws", repos="https://rstudiopm.fao.org/fao-sws-cran/latest" )
+# install.packages("faoswsUtil", repos="https://rstudiopm.fao.org/fao-sws-cran/latest" )
+# install.packages("faoswsModules", repos="https://rstudiopm.fao.org/fao-sws-cran/latest" )
+## install.packages("faoswsFeed", repos="https://rstudiopm.fao.org/fao-sws-cran/latest" )
+## install.packages("~/fao2025/sws-stat-faoswsfeed", repos=NULL, type="source")
+## install.packages("faoswsEnsure", repos="https://rstudiopm.fao.org/fao-sws-cran/latest" )
+## install.packages("faoswsProduction", repos="https://rstudiopm.fao.org/fao-sws-cran/latest" )
+## install.packages("faoswsModules", repos="https://rstudiopm.fao.org/fao-sws-cran/latest" )
+## install.packages("faoswsTrade", repos="https://rstudiopm.fao.org/fao-sws-cran/latest" )
+## if (!require("Require")) {
+##    install.packages("Require"); require("Require")
+##    }
 library(faosws)
 library(faoswsModules)
 library(faoswsUtil)
-library(faoswsFeed)
-Require(data.table)
-Require(dplyr)
-Require(tidyr)
-Require(shiny)
-Require(shinyjs)
-Require(ggplot2)
-Require(ggiraph)
-Require(ggnewscale)
-Require(colorspace)
-#Require(hablar)
-Require(countrycode)
-Require(shinyTree)
-Require(paletteer)
-Require(rrapply)
+## library(faoswsFeed)
+require(data.table)
+require(dplyr)
+require(tidyr)
+require(shiny)
+require(shinyjs)
+require(ggplot2)
+require(ggiraph)
+require(ggnewscale)
+require(colorspace)
+#require(hablar)
+require(countrycode)
+require(shinyTree)
+require(paletteer)
+require(rrapply)
 
 options(scipen = 999999)
 colorred <- "#ca0020"
@@ -242,72 +245,7 @@ data_key <- DatasetKey(
       )
   )
 )
-#3 tree <- GetData(data_key)
 
-
-
-# fbs |> select(Area,Area_Code) |> unique() |>
-#     as.data.table() -> fbs.areas
-# fbs.areas[order(Area_Code)]->fbs.areas
-# fbs.areas$Area[c(82,175)] <- c("Code d'Ivore", "Turkey")
-#
-# fbs |> select(Element,Element_Code,Unit) |>
-#     unique() |> as.data.table() |>
-#     subset(Element_Code!=511) -> fbs.elements
-# fbs.elements[Unit=="1000 t",Scale:="Quantity"]
-# fbs.elements[Element_Code==5301,Element:="Domestic supply"]
-# fbs.elements[Element_Code==661,Element:="Domestic supply"]
-# fbs.elements[Element_Code==681,Element:="Domestic supply"]
-# fbs.elements[Element_Code==671,Element:="Domestic supply"]
-# fbs.elements[Element_Code==661,Scale:="Calories"]
-# fbs.elements[Element_Code==681,Scale:="Fat"]
-# fbs.elements[Element_Code==671,Scale:="Protein"]
-# fbs.elements[is.na(Scale),Scale:="Per capita"]
-# fbs.elements[,.(ElementNew=Element,Element_Code,Scale)]->fbs.elements
-
-
-# fbsplot <- function(data1=fbs1, data2=fbs2, item, percap, flag) {
-#     if (item != "All") {
-#         data1 <- data1 |> filter(Item_Code==item)
-#         data2 <- data2 |> filter(Item_Code==item)
-#     }
-#     ggplot()+
-#         geom_bar(data = data1, stat="identity",
-#                  aes(x=Year,y=Value,group=Element,fill=Element),
-#                  width=0.3, size=0.1)+
-#         scale_fill_viridis_d(name="Supply", direction=-1)+
-#         new_scale_fill()+
-#         geom_bar(data = data2, stat="identity",
-#                  aes(x=Year,y=Value,group=Element,fill=Element),
-#                  width=0.3, size=0.1) +
-#         scale_fill_brewer(name="Utilization",palette="Set1", direction=-1)+
-#         facet_wrap(~Item, ncol=1, scales="free_y")->p
-#
-#
-#     if(percap==TRUE) {
-#         p <- p + scale_y_continuous("Kilograms per capita")
-#     } else if (item < 2000) {
-#         p <- p + scale_y_continuous("Tonnes")
-#     } else {
-#         p <- p + scale_y_continuous("Thousand tonnes")
-#     }
-#     if(flag==TRUE) {
-#         p <- p+geom_text(data=data1,
-#                          aes(x=Year, y=Value, label=Flag,
-#                              group=Element), angle=90,
-#                          position = position_stack(vjust = 0.5),
-#                          size=3,vjust="middle",lineheight=0.3
-#                          )+
-#             geom_text(data=data2,
-#                       aes(x=Year, y=Value, label=Flag,
-#                           group=Element), angle=90,
-#
-#                       position = position_stack(vjust = 0.5),
-#                       size=3,vjust="middle",lineheight=0.3
-#                       )
-#     }
-#     return(p)
-# }
 
 calplot <- function(data1=fbs1, data2=fbs2, data3=food,
                     unit, percap, fillscale) {
@@ -381,9 +319,16 @@ priceplot <- function(pricedata){
 #                        strip.background = element_rect(fill = 'white', colour = 'white'))
 # }
 
-
-
-
+landuse <- fread("inputs_landuse.csv")
+names(landuse) <- gsub(" ","_",names(landuse))
+names(landuse) <- gsub("(","",names(landuse), fixed=TRUE)
+names(landuse) <- gsub(")","",names(landuse), fixed=TRUE)
+landuse <- landuse[Element_Code==5110,.(Area,
+                      geographicAreaM49 = gsub("'","",Area_Code_M49, fixed=TRUE),
+                      Year,
+                      Item_Code,
+                      Item,
+                      Value = Value*1000)]
 ui <- fluidPage(
     titlePanel("Analysis of Supply Utilization Accounts"),
     includeCSS("solarized-dark.css"),
@@ -424,7 +369,7 @@ ui <- fluidPage(
                                                min=1, max=7,
                                                value=5
                                                ),
-                                  h3("Select the items/groups for which you want to see the production nd yield statistics:"),
+                                  h3("Select the items/groups for which you want to see the production and yield statistics:"),
                                   shinyTree("selectproditems", checkbox=TRUE),
                                   actionButton("showcalplot", label="Plot"),
                                   width=3),
@@ -886,15 +831,26 @@ server <- function(input, output, session) {
                                                           .(Item = unique(Item)),
                                                           .(rank(-GCA))][
                                       order(rank)]$Item)
-
-        areaplot <- ggplot(areaplotdata,
-                           aes(x=Year, y=GCA, fill=Item))+
-          geom_bar_interactive(stat="identity",
-                               aes(tooltip=paste0(Item," (",
+        lu <- landuse[Area == input$selectcalcountriesin][
+          Item_Code %in% c("6600","6620","6621")][
+          Year >= input$selectcalyearsin[1]][
+          Year <= input$selectcalyearsin[2]]
+        areaplot <- ggplot()+
+          geom_bar_interactive(data=areaplotdata,
+                               stat="identity",
+                               aes(x=Year, y=GCA, fill=Item,
+                                   tooltip=paste0(Item," (",
                                                   round(GCA),
                                                   ")")),
                                width=0.8, linewidth=0.1) +
+          geom_line(data=lu, aes(x = Year, y=Value,
+                                 colour = Item,
+                                 group = Item)) +
+          geom_point(data=lu, aes(x = Year, y=Value,
+                                  colour = Item,
+                                  group = Item)) +
           scale_y_continuous("Hectares") +
+          scale_colour_discrete("Land use") +
           paletteer::scale_fill_paletteer_d("PrettyCols::Autumn", name="Crops",
                           guide = guide_legend(position="bottom")) +
           theme_classic() +
