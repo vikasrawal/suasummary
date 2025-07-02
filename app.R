@@ -3,15 +3,15 @@
 repos <- c(#CRAN = "https://cloud.r-project.org",
            FAO = "https://rstudiopm.fao.org/fao-sws-cran/latest")
 options(repos = repos)
-# renv::init()
-# install.packages("faosws", repos="https://rstudiopm.fao.org/fao-sws-cran/latest" )
-# install.packages("faoswsUtil", repos="https://rstudiopm.fao.org/fao-sws-cran/latest" )
-# install.packages("faoswsModules", repos="https://rstudiopm.fao.org/fao-sws-cran/latest" )
+## # renv::init() # Keep this commented
+## install.packages("faosws", repos="https://rstudiopm.fao.org/fao-sws-cran/latest" )
+## install.packages("faoswsUtil", repos="https://rstudiopm.fao.org/fao-sws-cran/latest" )
+## install.packages("faoswsModules", repos="https://rstudiopm.fao.org/fao-sws-cran/latest" )
 ## install.packages("faoswsFeed", repos="https://rstudiopm.fao.org/fao-sws-cran/latest" )
 ## install.packages("~/fao2025/sws-stat-faoswsfeed", repos=NULL, type="source")
 ## install.packages("faoswsEnsure", repos="https://rstudiopm.fao.org/fao-sws-cran/latest" )
 ## install.packages("faoswsProduction", repos="https://rstudiopm.fao.org/fao-sws-cran/latest" )
-## install.packages("faoswsModules", repos="https://rstudiopm.fao.org/fao-sws-cran/latest" )
+## install.packages("faoswsModules", repos="https://rstuhmdiopm.fao.org/fao-sws-cran/latest" )
 ## install.packages("faoswsTrade", repos="https://rstudiopm.fao.org/fao-sws-cran/latest" )
 ## if (!require("Require")) {
 ##    install.packages("Require"); require("Require")
@@ -35,7 +35,7 @@ require(shinyTree)
 require(paletteer)
 require(rrapply)
 
-options(scipen = 999999)
+options(scipen = 9999)
 colorred <- "#ca0020"
 colorgreen <- "#1a9641"
 colorblue <- "#0571b0"
@@ -381,7 +381,7 @@ ui <- fluidPage(
                          ## uiOutput("prodplotout"),
                          girafeOutput("prodplotout", width = "100%", height = "700px"),
                          h3("Area harvested of major crops"),
-                         uiOutput("areaplotout"),
+                         girafeOutput("areaplotout"),
                          h3("Area and yield of major crops"),
                          selectInput("selectareayield",
                                      "Select which variable to plot on the y-axis",
@@ -842,13 +842,23 @@ server <- function(input, output, session) {
                                    tooltip=paste0(Item," (",
                                                   round(GCA),
                                                   ")")),
-                               width=0.8, linewidth=0.1) +
-          geom_line(data=lu, aes(x = Year, y=Value,
-                                 colour = Item,
-                                 group = Item)) +
-          geom_point(data=lu, aes(x = Year, y=Value,
-                                  colour = Item,
-                                  group = Item)) +
+                               width=0.8, linewidth=0.1)
+        if (isTruthy(input$areaplotout_selected)) {
+          lusel <- lu[!(Item %in% input$areaplotout_selected)]
+        } else {
+          lusel <- copy(lu)
+        }
+        areaplot <- areaplot+
+          geom_line_interactive(data=lusel,
+                                aes(x = Year, y=Value,
+                                    colour = Item,
+                                    group = Item,
+                                    data_id = Item)) +
+          geom_point_interactive(data=lusel,
+                                 aes(x = Year, y=Value,
+                                     colour = Item,
+                                     group = Item,
+                                     data_id = Item)) +
           scale_y_continuous("Hectares") +
           scale_colour_discrete("Land use") +
           paletteer::scale_fill_paletteer_d("PrettyCols::Autumn", name="Crops",
@@ -935,8 +945,18 @@ server <- function(input, output, session) {
             get_plot_output_list()[[1]]
         })
 
-        output$areaplotout <- renderUI({
-            get_plot_output_list()[[2]]
+        output$areaplotout <- renderGirafe({
+           girafe(
+                ggobj = areaplot,
+                options = list(
+                    ## opts_sizing(rescale = TRUE,width=1),
+                    ## opts_zoom = opts_zoom(min = 1, max = 4),
+                    opts_selection(type = "single",
+                                   css = "fill:yellow;stroke:gray;r:5pt;")
+                ),
+                width_svg = 12,
+                height_svg = 6
+            )
         })
 
         output$aylogplotout <- renderUI({
